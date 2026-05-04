@@ -1,0 +1,2 @@
+"""CobrarApp FastAPI package."""
+

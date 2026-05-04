@@ -1,0 +1,179 @@
+{
+  "name": "CobrarApp - WhatsApp Grupo WPPConnect",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cobrapp-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "whatsapp-webhook",
+      "name": "Webhook WhatsApp WPPConnect",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -760,
+        -80
+      ],
+      "webhookId": "cobrapp-whatsapp"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://python-api:8000/whatsapp/procesar-evento",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "process-whatsapp-event",
+      "name": "Procesar evento WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -520,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ Boolean($json.debe_confirmar && $json.group_id && $json.confirmacion) }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-should-confirm",
+      "name": "Debe confirmar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ `${$env.WPPCONNECT_BASE_URL || 'http://wppconnect:21465'}/api/${$env.WPPCONNECT_SESSION || 'cobrapp'}/send-message` }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ `Bearer ${$env.WPPCONNECT_TOKEN || ''}` }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ phone: $json.group_id, isGroup: true, isNewsletter: false, isLid: false, message: $json.confirmacion }) }}",
+        "options": {}
+      },
+      "id": "send-whatsapp-confirmation",
+      "name": "Enviar confirmación al grupo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -40,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ...$node['Procesar evento WhatsApp'].json, envio_whatsapp: $json }) }}",
+        "options": {}
+      },
+      "id": "respond-with-confirmation",
+      "name": "Responder con confirmación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-no-confirmation",
+      "name": "Responder sin confirmación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -40,
+        60
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp WPPConnect": {
+      "main": [
+        [
+          {
+            "node": "Procesar evento WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar evento WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Debe confirmar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debe confirmar?": {
+      "main": [
+        [
+          {
+            "node": "Enviar confirmación al grupo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder sin confirmación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar confirmación al grupo": {
+      "main": [
+        [
+          {
+            "node": "Responder con confirmación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "versionId": "cobrapp-whatsapp-wppconnect-1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

@@ -1,0 +1,81 @@
+services:
+  python-api:
+    build:
+      context: ./python-api
+    container_name: cobrapp-python-api
+    ports:
+      - "8000:8000"
+    environment:
+      PAYMENTS_XLSX_PATH: ${PAYMENTS_XLSX_PATH:-/app/pagos/pagos.xlsx}
+      N8N_PAYMENT_WEBHOOK_URL: ${N8N_PAYMENT_WEBHOOK_URL:-http://n8n:5678/webhook/cobrapp-pago}
+      N8N_PAYMENT_WEBHOOK_TEST_URL: ${N8N_PAYMENT_WEBHOOK_TEST_URL:-http://n8n:5678/webhook-test/cobrapp-pago}
+      N8N_WHATSAPP_WEBHOOK_URL: ${N8N_WHATSAPP_WEBHOOK_URL:-http://n8n:5678/webhook/cobrapp-whatsapp}
+      N8N_WHATSAPP_WEBHOOK_TEST_URL: ${N8N_WHATSAPP_WEBHOOK_TEST_URL:-http://n8n:5678/webhook-test/cobrapp-whatsapp}
+      WPPCONNECT_BASE_URL: ${WPPCONNECT_BASE_URL:-http://wppconnect:21465}
+      WPPCONNECT_SESSION: ${WPPCONNECT_SESSION:-cobrapp}
+      WPPCONNECT_SECRET_KEY: ${WPPCONNECT_SECRET_KEY:-}
+      WPPCONNECT_TOKEN: ${WPPCONNECT_TOKEN:-}
+      WHATSAPP_GROUP_ID: ${WHATSAPP_GROUP_ID:-}
+    volumes:
+      - ./pagos:/app/pagos
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: cobrapp-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:-admin123}
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: America/Lima
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      WPPCONNECT_BASE_URL: ${WPPCONNECT_BASE_URL:-http://wppconnect:21465}
+      WPPCONNECT_SESSION: ${WPPCONNECT_SESSION:-cobrapp}
+      WPPCONNECT_SECRET_KEY: ${WPPCONNECT_SECRET_KEY:-}
+      WPPCONNECT_TOKEN: ${WPPCONNECT_TOKEN:-}
+      WHATSAPP_GROUP_ID: ${WHATSAPP_GROUP_ID:-}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - python-api
+      - wppconnect
+
+  wppconnect:
+    image: ibsddev/wppconnect-server:latest
+    platform: linux/amd64
+    container_name: wpp-server
+    restart: unless-stopped
+    ports:
+      - "21465:21465"
+    environment:
+      NODE_ENV: production
+      PORT: 21465
+      WPP_SECRET_KEY: ${WPPCONNECT_SECRET_KEY:?set WPPCONNECT_SECRET_KEY in .env}
+      WPP_HOST: http://localhost
+      WPP_START_ALL_SESSION: "true"
+      WPP_TOKEN_STORE_TYPE: file
+      WPP_WEBHOOK_URL: http://python-api:8000/whatsapp/n8n-bridge
+      WPP_WEBHOOK_AUTO_DOWNLOAD: "true"
+      WPP_WEBHOOK_LISTEN_ACKS: "false"
+      WPP_WEBHOOK_ON_SELF_MESSAGE: "true"
+      WPP_WEBHOOK_ON_PRESENCE_CHANGED: "false"
+      WPP_WEBHOOK_ON_PARTICIPANTS_CHANGED: "false"
+      WPP_WEBHOOK_ON_REACTION_MESSAGE: "false"
+      WPP_WEBHOOK_ON_POLL_RESPONSE: "false"
+      WPP_WEBHOOK_ON_REVOKED_MESSAGE: "false"
+      WPP_WEBHOOK_ON_LABEL_UPDATED: "false"
+    volumes:
+      - wpp_tokens:/usr/src/wpp-server/tokens
+      - wpp_userdata:/usr/src/wpp-server/userDataDir
+      - wpp_logs:/usr/src/wpp-server/log
+
+volumes:
+  n8n_data:
+  wpp_tokens:
+  wpp_userdata:
+  wpp_logs:
